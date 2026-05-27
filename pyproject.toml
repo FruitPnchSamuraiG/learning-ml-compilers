@@ -3,7 +3,13 @@ name = "tensor-ir"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
+    "ipython>=9.13.0",
     "mlc-ai-nightly-cpu>=0.20.dev1070",
+    "pytest>=9.0.3",
 ]
+
+[tool.uv]
+prerelease = "allow"
+find-links = ["https://mlc.ai/wheels"]
