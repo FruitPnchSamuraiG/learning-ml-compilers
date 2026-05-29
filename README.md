@@ -49,4 +49,9 @@ RUN      rt_lib["mm_relu"](a, b, c)  →  executes on hardware
 VERIFY   np.testing.assert_allclose(...)  →  checks correctness
 ```
 
+## Code
+
+- `main.py` — Chapter 2 notes and examples (coded by me, annotated by Claude)
+- `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation (coded by me, annotated by Claude)
+
 
