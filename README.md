@@ -49,9 +49,66 @@ RUN      rt_lib["mm_relu"](a, b, c)  →  executes on hardware
 VERIFY   np.testing.assert_allclose(...)  →  checks correctness
 ```
 
+## Chapter 2 Exercises — What I Learned
+
+### Writing TensorIR
+
+Every TensorIR function has three parts: buffers (the data), loops (iteration), and compute statements (the math). Axes are annotated as spatial (`S`) or reduce (`R`) — spatial axes are output dimensions that can be parallelized, reduce axes are accumulation dimensions that cannot.
+
+```python
+vi, vj, vk = T.axis.remap("SSR", [i, j, k])  # j loops = spatial, k = reduce
+with T.init():
+    Y[vi, vj] = 0       # runs once per (i,j) before the k reduction
+Y[vi, vj] += A[vi, vk] * B[vk, vj]
+```
+
+### Schedule Primitives
+
+| Primitive | What it does |
+|---|---|
+| `split(loop, factors=[a, b])` | Break one loop into two (outer × inner) |
+| `reorder(l1, l2, ...)` | Change the order of loops |
+| `parallel(loop)` | Run this loop across CPU cores |
+| `vectorize(loop)` | Use SIMD instructions for this loop |
+| `unroll(loop)` | Eliminate loop overhead by inlining iterations |
+| `reverse_compute_at(block, loop)` | Move a consumer block inside a producer's loop |
+| `decompose_reduction(block, loop)` | Separate init (zeroing) from update (accumulation) |
+
+### `get_loops` always returns all surrounding loops
+
+```python
+n, i, j, k = sch.get_loops(Y)
+# returns every loop from outermost → innermost that wraps the block
+```
+
+After `reverse_compute_at(C, j0)`, calling `get_loops(C)` returns `[n, i, j0, ax0]` — all loops now surrounding C, not just its own.
+
+### Ordering rules that matter
+
+1. `parallel` must come **before** `decompose_reduction` — TVM needs the whole reduction block intact to verify the parallel is safe.
+2. `reorder` must come **before** `reverse_compute_at` — the consumer block needs to see the final loop order when being moved.
+3. `split` must come **before** `reorder` — the new loops need to exist before you can reorder them.
+
+### Why each transformation helps performance
+
+```
+split j (chunks of 8)   → right size for SIMD vectorization
+split k (chunks of 4)   → right size for loop unrolling
+reorder (j1 innermost)  → cache-friendly memory access
+parallel (n)            → spreads batches across CPU cores
+vectorize (j1)          → processes 8 elements per SIMD instruction
+unroll (k1)             → removes 4-iteration loop overhead
+reverse_compute_at      → relu reads Y while it's still in cache
+decompose_reduction     → clean separation of init and update phases
+```
+
+**Core insight:** The same computation expressed with different loop structure produces very different performance. TensorIR makes the loop structure explicit so the compiler — or you — can transform it to match what the hardware is good at (multiple cores, SIMD units, cache hierarchy).
+
+---
+
 ## Code
 
-- `main.py` — Chapter 2 notes and examples (coded by me, annotated by Claude)
+- `tensorIR.py` — Chapter 2 notes and examples (coded by me, annotated by Claude)
 - `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation (coded by me, annotated by Claude)
 
 
