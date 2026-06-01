@@ -106,9 +106,44 @@ decompose_reduction     → clean separation of init and update phases
 
 ---
 
+## Chapter 3 — End-to-End Model Execution
+
+### New abstractions introduced
+
+**Relax (`@R.function`)** — the high-level orchestrator. Describes the full model as a computational graph connecting primitive functions together. Lives alongside TensorIR prim_funcs in the same IRModule.
+
+**`call_dps_packed`** — bridges DPS (Destination Passing Style) primitive functions into the Relax graph. DPS functions write into an output buffer rather than returning a value — `call_dps_packed` allocates that buffer and makes the result a trackable value in the graph.
+
+```python
+lv0 = R.call_dps_packed("linear0", (x, w0, b0), R.Tensor((1, n), "float32"))
+```
+
+**`R.dataflow()` block** — marks a region of pure computation (no side effects). TVM can freely optimize inside this block. `R.output()` declares what leaves it.
+
+**`T.handle` + `T.match_buffer`** — used instead of `T.Buffer` when shapes are dynamic (not known until runtime). The sizes are declared as `T.int64()` variables and resolved at runtime.
+
+**`BindParams`** — bakes model weights into the IRModule. Before: `vm["main"](data, w0, b0, w1, b1)`. After: `vm["main"](data)`. Useful for inference since weights don't change after training.
+
+**External library calls (`env.linear`, `env.relu`)** — register PyTorch (or any) functions under a TVM global name. The Relax graph calls them identically to TensorIR prim_funcs. Zero-copy via DLPack: `torch.from_dlpack(tvm_tensor)` shares memory between frameworks — no data duplication.
+
+### The MLC theme
+
+```
+same computation → multiple abstractions
+numpy → TensorIR → Relax → compiled code
+
+MLC = transform between abstractions
+    = get best performance on target hardware
+```
+
+The key flexibility: TensorIR and external libraries can be mixed in the same module. You can write and optimize specific ops in TensorIR, and delegate others to PyTorch/cuDNN — all connected through the same Relax graph.
+
+---
+
 ## Code
 
 - `tensorIR.py` — Chapter 2 notes and examples (coded by me, annotated by Claude)
 - `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation (coded by me, annotated by Claude)
+- `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST (coded by me, annotated by Claude)
 
 
