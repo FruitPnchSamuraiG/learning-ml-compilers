@@ -8,46 +8,40 @@ Working through the [MLC (Machine Learning Compilation) course](https://mlc.ai/c
 > - `pytest` is required as a dependency even if you're not running tests — tvm imports it internally and will crash without it.
 > - Pin your Python version to `>=3.11,<3.13` — the package doesn't support 3.13 yet and uv will fail to resolve without this constraint.
 
-## Key Concepts
+## How TVM Works
 
-**TVM** — The overall ML compiler framework. Takes a model and compiles it to run efficiently on hardware. Everything else below lives inside TVM.
+TVM is an ML compiler: it takes a model and compiles it to run efficiently on a specific hardware target (CPU, GPU, phone, custom chip). The same model can be compiled for different targets without rewriting anything.
 
-**TensorIR** — The intermediate representation TVM works with internally. Every computation is expressed as three things: buffers (the data), loops (how to iterate), and compute statements (the math).
-
-**TVMScript** — The Python-like syntax used to write TensorIR by hand. Human-readable way to express TensorIR directly.
-```python
-@tvm.script.ir_module
-class MyModule:
-    @T.prim_func
-    def mm_relu(A: T.Buffer(...), ...):
-        ...
+```
+YOUR MODEL (PyTorch / numpy / etc.)
+        ↓
+   IRModule — TVM's internal representation, holds two things:
+   ├── Relax  (@R.function)   — the computational graph; describes how layers connect
+   └── TensorIR  (@T.prim_func) — the individual ops; describes the actual loops and math
+        ↓
+   OPTIMIZE — two ways:
+   ├── Manual:    sch.split() / reorder() / vectorize() / parallel() / ...
+   └── Automatic: TVM searches thousands of variants and picks the fastest (Chapter 4)
+        ↓
+   tvm.compile(mod, target="llvm")  →  machine code for your hardware
+        ↓
+   VirtualMachine / rt_lib  →  run on device
 ```
 
-**Tensor Expression (TE)** — A higher-level, declarative way to describe computations without writing loops. TVM generates the TensorIR loops automatically.
-```python
-Y = te.compute((128, 128), lambda i, j: te.sum(A[i, k] * B[k, j], axis=k))
-```
+**Component quick reference:**
 
-**IRModule** — A container that holds one or more tensor functions. TVMScript and TE both produce an IRModule.
+| Component | What it is |
+|---|---|
+| `IRModule` | Container that holds the whole program (Relax + TensorIR functions) |
+| `@R.function` (Relax) | High-level graph — describes model structure like `forward()` in PyTorch |
+| `@T.prim_func` (TensorIR) | Low-level op — explicit loops, buffers, and math |
+| `TVMScript` | Python-like syntax for writing TensorIR/Relax by hand |
+| `Tensor Expression (TE)` | Declarative shorthand that auto-generates TensorIR loops |
+| `Schedule` | Wraps an IRModule and lets you restructure loops without changing the result |
+| `tvm.compile` | Converts the optimized IRModule into runnable machine code |
+| `VirtualMachine` | Executes compiled Relax programs on a device |
 
-**Schedule** — A transformation tool that wraps an IRModule and lets you restructure its loops without changing the result.
-
-**Schedule Primitives** — The individual transformation operations applied through a Schedule:
-```
-sch.split()                → split one loop into two
-sch.reorder()              → change the order of loops
-sch.reverse_compute_at()   → move a block closer to where its output is used
-sch.decompose_reduction()  → separate the init (zeroing) from the update (accumulation)
-```
-
-**How it all fits together:**
-```
-WRITE    TVMScript or TE  →  TensorIR stored in IRModule
-TRANSFORM  Schedule + primitives  →  optimized IRModule
-COMPILE  tvm.compile(mod, target="llvm")  →  runnable machine code
-RUN      rt_lib["mm_relu"](a, b, c)  →  executes on hardware
-VERIFY   np.testing.assert_allclose(...)  →  checks correctness
-```
+**Why TVM exists:** there are many ML frameworks (PyTorch, JAX, TensorFlow) and many hardware targets (CPU, GPU, TPU, phones). Every combination would need manual optimization — TVM automates this so a model written once can run fast anywhere.
 
 ## Chapter 2 Exercises
 
