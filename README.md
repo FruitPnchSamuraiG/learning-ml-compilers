@@ -49,7 +49,7 @@ RUN      rt_lib["mm_relu"](a, b, c)  →  executes on hardware
 VERIFY   np.testing.assert_allclose(...)  →  checks correctness
 ```
 
-## Chapter 2 Exercises — What I Learned
+## Chapter 2 Exercises
 
 ### Writing TensorIR
 
