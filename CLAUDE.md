@@ -17,8 +17,11 @@ This is a learning project for the MLC (Machine Learning Compilation) course. Th
 
 ```python
 import tvm
+from tvm import relax, te
 from tvm.ir.module import IRModule
-from tvm.script import tir as T
+from tvm.script import tirx as T
+from tvm.script import relax as R
+from tvm.s_tir import meta_schedule as ms
 ```
 
 ## Style
