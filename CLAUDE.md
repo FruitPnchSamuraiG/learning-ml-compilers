@@ -5,7 +5,6 @@ This is a learning project for the MLC (Machine Learning Compilation) course. Th
 ## Project
 
 - Working through https://mlc.ai course exercises chapter by chapter
-- Current focus: Chapter 2 — TensorIR
 
 ## Environment
 
