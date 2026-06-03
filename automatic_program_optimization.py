@@ -60,7 +60,7 @@ c_nd = tvm.runtime.tensor(np.empty((128, 128), dtype="float32"))
 
 lib = tvm.compile(MyModule, target="llvm")
 f_timer_before = lib.mod.time_evaluator("main", tvm.cpu())
-# print("Time cost of MyModule: %.3f ms" % (f_timer_before(a_nd, b_nd, c_nd).mean * 1000))
+print("Time cost of MyModule: %.3f ms" % (f_timer_before(a_nd, b_nd, c_nd).mean * 1000))
 
 # -----------------------------------------------------------------------------
 # Deterministic schedule (Chapter 2 style) — fixed jfactor, same result always
@@ -80,9 +80,9 @@ sch = schedule_mm(sch)
 
 lib = tvm.compile(sch.mod, target="llvm")
 f_timer_after = lib.mod.time_evaluator("main", tvm.cpu())
-# print("Time cost of MyModule=>schedule_mm: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
+print("Time cost of MyModule=>schedule_mm: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
 
-# print(sch.trace)
+print(sch.trace)
 
 # -----------------------------------------------------------------------------
 # Stochastic schedule — uses sample_perfect_tile instead of a fixed jfactor.
@@ -109,7 +109,7 @@ sch = tvm.s_tir.Schedule(MyModule)
 sch = stochastic_schedule_mm(sch)
 
 # print(sch.mod.script())
-# print(sch.trace)   # trace shows: decision=[8,16] — the actual values chosen
+print(sch.trace)   # trace shows: decision=[8,16] — the actual values chosen
 
 # Stepping through the stochastic schedule manually to inspect types/trace:
 sch = tvm.s_tir.Schedule(MyModule)
@@ -117,7 +117,7 @@ block_C = sch.get_sblock("C", "main")
 i, j, k = sch.get_loops(block=block_C)
 j_factors = sch.sample_perfect_tile(loop=j, n=2)
 
-# print(type(j_factors[0]))   # → tvm.tir.expr.Var (symbolic, not a number!)
+print(type(j_factors[0]))   # → tvm.tir.expr.Var (symbolic, not a number!)
 
 # print(sch.trace)
 # print(sch.mod.script())   # module unchanged — decisions not applied until split
@@ -313,10 +313,10 @@ vm = relax.VirtualMachine(ex, tvm.cpu())
 nd_res = vm["main"](data_nd)
 
 pred_kind = np.argmax(nd_res.numpy(), axis=1)
-# print("MyModuleWithParams Prediction:", class_names[pred_kind[0]])
+print("MyModuleWithParams Prediction:", class_names[pred_kind[0]])
 
 ftimer = vm.module.time_evaluator("main", tvm.cpu(), number=100)
-# print("MyModuleWithParams time-cost: %g ms" % (ftimer(data_nd).mean * 1000))
+print("MyModuleWithParams time-cost: %g ms" % (ftimer(data_nd).mean * 1000))
 
 # Step 1: extract linear0 and rename to "main" so tune_tir can treat it
 # as a standalone module — tune_tir expects a module with a "main" function
