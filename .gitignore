@@ -12,3 +12,6 @@ wheels/
 __pycache__/
 *.pyc
 CLAUDE.md
+data/
+*.pkl
+tune_tmp/
