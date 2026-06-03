@@ -60,10 +60,8 @@ res = numpy_mlp(img.reshape(1, 784),
                 mlp_params["b0"],
                 mlp_params["w1"],
                 mlp_params["b1"])
-# print(res)
-# pred_kind = res.argmax(axis=1)
-# print(pred_kind)
-# print("NumPy-MLP Prediction:", class_names[pred_kind[0]])
+pred_kind = res.argmax(axis=1)
+print("NumPy-MLP Prediction:", class_names[pred_kind[0]])
 
 
 # -----------------------------------------------------------------------------
@@ -124,7 +122,7 @@ result =lnumpy_mlp(
     mlp_params["b1"])
 
 pred_kind = result.argmax(axis=1)
-# print("Low-level Numpy MLP Prediction:", class_names[pred_kind[0]])
+print("Low-level Numpy MLP Prediction:", class_names[pred_kind[0]])
 
 # -----------------------------------------------------------------------------
 # TensorIR + Relax module
@@ -219,7 +217,7 @@ result = lnumpy_mlp_with_call_dps_packed(
     mlp_params["b1"])
 
 pred_kind = np.argmax(result, axis=1)
-# print("Low-level Numpy with CallTIR Prediction:", class_names[pred_kind[0]])
+print("Low-level Numpy with CallTIR Prediction:", class_names[pred_kind[0]])
 
 # print(MyModule.script())
 
@@ -241,7 +239,7 @@ nd_res = vm["main"](data_nd,
                     nd_params["b1"])
 # print(nd_res)
 pred_kind = np.argmax(nd_res.numpy(), axis=1)
-# print("MyModule Prediction:", class_names[pred_kind[0]])
+print("MyModule Prediction:", class_names[pred_kind[0]])
 
 
 # -----------------------------------------------------------------------------
@@ -302,7 +300,7 @@ nd_res = vm["main"](data_nd,
                     nd_params["b1"])
 
 pred_kind = np.argmax(nd_res.numpy(), axis=1)
-# print("MyModuleWithExternCall Prediction:", class_names[pred_kind[0]])
+print("MyModuleWithExternCall Prediction:", class_names[pred_kind[0]])
 
 # -----------------------------------------------------------------------------
 # Mixing TensorIR and external libraries in the same module
@@ -360,7 +358,7 @@ nd_res = vm["main"](data_nd,
                     nd_params["b1"])
 
 pred_kind = np.argmax(nd_res.numpy(), axis=1)
-# print("MyModuleMixture Prediction:", class_names[pred_kind[0]])
+print("MyModuleMixture Prediction:", class_names[pred_kind[0]])
 
 # -----------------------------------------------------------------------------
 # BindParams: bakes the model weights into the IRModule
