@@ -158,8 +158,8 @@ def random_search(mod: tvm.IRModule, num_trials=5):
 
     return best_sch
 
-# sch = random_search(MyModule)
-# print(sch.trace)
+sch = random_search(MyModule)
+print(sch.trace)
 
 
 # -----------------------------------------------------------------------------
@@ -173,9 +173,8 @@ def random_search(mod: tvm.IRModule, num_trials=5):
 # max_trials_global = total search budget (number of variants to try)
 # num_trials_per_iter = how many per round (more rounds = smarter search)
 #
-# NOTE: tune_tir with manual ScheduleFn space has a known runner issue in
-# this version of mlc-ai-nightly — all trials return N/A latency. The
-# auto-scheduling version below (no space= parameter) works correctly.
+# Commented out: broken in this version of mlc-ai-nightly — tune_tir with a
+# manual ScheduleFn space returns N/A latency for all trials (runner issue).
 # -----------------------------------------------------------------------------
 
 # database = ms.tune_tir(
@@ -203,6 +202,9 @@ def random_search(mod: tvm.IRModule, num_trials=5):
 # spatial and reduce loops for better cache behavior than manual split.
 #
 # Result: auto-scheduling outperforms manual space (e.g. 0.158ms vs 0.181ms).
+#
+# Commented out: standalone demo on MyModule — the end-to-end section below
+# runs the real auto-tune on mod_linear (the actual model layer).
 # -----------------------------------------------------------------------------
 
 # database = ms.tune_tir(
