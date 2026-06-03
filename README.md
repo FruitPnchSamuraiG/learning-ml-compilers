@@ -134,10 +134,108 @@ The key flexibility: TensorIR and external libraries can be mixed in the same mo
 
 ---
 
+## Chapter 4 — Automatic Program Optimization
+
+### The problem Chapter 4 solves
+
+In Chapters 2 and 3, we manually chose transformations — split `j` by 4, reorder, vectorize. But how do we know 4 is the best factor? What if 8 is faster? Trying every combination by hand is impossible. Chapter 4 lets TVM search automatically.
+
+### Deterministic vs Stochastic schedule
+
+A **deterministic schedule** always applies the same transformation:
+```python
+j_0, j_1 = sch.split(j, factors=[None, 4])  # always 4, same result every time
+```
+
+A **stochastic schedule** uses `sample_perfect_tile` to randomly pick valid split factors:
+```python
+j_factors = sch.sample_perfect_tile(loop=j, n=2)  # could be [4,32], [8,16], [16,8], ...
+j_0, j_1 = sch.split(loop=j, factors=j_factors)
+```
+
+The stochastic schedule function doesn't describe one program — it describes an entire **search space** of valid programs. Every call to it produces a different variant.
+
+### Symbolic variables and the trace
+
+`sample_perfect_tile` returns **symbolic variables** (`tvm.tir.expr.Var`), not real numbers. The actual chosen values are stored in the trace's `decision` field:
+
+```python
+# trace shows:
+v4, v5 = sch.sample_perfect_tile(..., decision=[8, 16])  # 8 and 16 were chosen this run
+```
+
+This lets TVM replay any past choice exactly (reproducible), or search over many different choices systematically.
+
+### Random search
+
+The simplest search: call the stochastic schedule repeatedly, compile each variant, benchmark it, keep the fastest:
+```python
+for i in range(num_trials):
+    sch = stochastic_schedule_mm(tvm.s_tir.Schedule(mod))  # random variant
+    result = f_timer(a, b, c).mean                          # benchmark it
+    if result < best_result: best_sch = sch                 # keep best
+```
+
+### MetaSchedule `tune_tir` — smarter than random search
+
+`tune_tir` does the same thing but with three improvements:
+
+| Feature | What it does |
+|---|---|
+| Parallel benchmarking | Compiles and runs many variants simultaneously |
+| XGBoost cost model | ML model predicts performance — skips bad variants without running them |
+| Evolutionary search | Learns from results; good variant → try similar ones next round |
+
+```python
+database = ms.tune_tir(
+    mod=MyModule,
+    target=tvm.target.Target({"kind": "llvm", "num-cores": 1}),
+    max_trials_global=64,   # total search budget
+    num_trials_per_iter=64, # per round (more rounds = smarter)
+    space=ms.space_generator.ScheduleFn(stochastic_schedule_mm),
+    work_dir="./tune_tmp",
+)
+```
+
+### Auto-scheduling (no manual space)
+
+If you omit the `space=` parameter, TVM analyzes the loop structure itself and generates the search space automatically — looking at spatial/reduce axes, data access patterns, and trying splits on all loops, parallelization, vectorization, and unrolling. The resulting structure is deeper than what we wrote manually (e.g. `SSRSRS` tiling — spatial/reduce loops interleaved across multiple levels) and produces better results.
+
+### Plugging the optimized op back into the full model
+
+```python
+# 1. Extract linear0, rename to "main" for tuning
+mod_linear = tvm.IRModule.from_expr(
+    MyModuleMixture["linear0"].with_attr("global_symbol", "main")
+)
+
+# 2. Tune
+database = ms.tune_tir(mod=mod_linear, ...)
+sch = ms.tir_integration.compile_tir(database, mod_linear, target)
+
+# 3. Rename back and swap into the full module
+new_func = sch.mod["main"].with_attr("global_symbol", "linear0")
+gv = MyModuleWithParams2.get_global_var("linear0")
+MyModuleWithParams2.update_func(gv, new_func)
+```
+
+### The full MLC picture
+
+```
+Chapter 2: ABSTRACTIONS  — how to represent computation (TensorIR, Relax)
+Chapter 3: END-TO-END    — how to connect ops into a full model
+Chapter 4: OPTIMIZATION  — how to find the fastest implementation automatically
+
+write simple code → TVM auto-tunes → fast deployment on any hardware
+```
+
+---
+
 ## Code
 
 - `tensorIR.py` — Chapter 2 notes and examples (coded by me, annotated by Claude)
 - `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation (coded by me, annotated by Claude)
 - `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST (coded by me, annotated by Claude)
+- `automatic_program_optimization.py` — Chapter 4 automatic optimization with meta_schedule (coded by me, annotated by Claude)
 
 
