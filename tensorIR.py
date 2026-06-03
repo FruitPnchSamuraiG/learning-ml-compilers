@@ -220,9 +220,9 @@ np.testing.assert_allclose(c_mm_relu, c_nd.numpy(), rtol=1e-5)
 
 # time_evaluator measures execution time — useful for comparing transformations
 f_timer_before = rt_lib.mod.time_evaluator("mm_relu", tvm.cpu())
-# print("Time cost of MyModule %g sec" % f_timer_before(a_nd, b_nd, c_nd).mean)
+print("Time cost of MyModule %g sec" % f_timer_before(a_nd, b_nd, c_nd).mean)
 f_timer_after = rt_lib_after.mod.time_evaluator("mm_relu", tvm.cpu())
-# print("Time cost of transformed sch.mod %g sec" % f_timer_after(a_nd, b_nd, c_nd).mean)
+print("Time cost of transformed sch.mod %g sec" % f_timer_after(a_nd, b_nd, c_nd).mean)
 
 # -----------------------------------------------------------------------------
 # 2.4.7. TensorIR Functions as Results of Transformations
