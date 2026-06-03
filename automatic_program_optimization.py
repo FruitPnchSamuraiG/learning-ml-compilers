@@ -323,7 +323,7 @@ print("MyModuleWithParams time-cost: %g ms" % (ftimer(data_nd).mean * 1000))
 # Step 1: extract linear0 and rename to "main" so tune_tir can treat it
 # as a standalone module — tune_tir expects a module with a "main" function
 mod_linear = tvm.IRModule.from_expr(MyModuleMixture["linear0"].with_attr("global_symbol", "main"))
-# print(mod_linear.script())
+print(mod_linear.script())
 
 # Step 2: auto-tune linear0 (no manual space — TVM generates it automatically)
 database = ms.tune_tir(

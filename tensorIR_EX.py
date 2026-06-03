@@ -51,6 +51,7 @@ b_tvm = tvm.runtime.tensor(b)
 c_tvm = tvm.runtime.tensor(np.empty((4, 4), dtype=np.int64))
 rt_lib["add"](a_tvm, b_tvm, c_tvm)
 np.testing.assert_allclose(c_tvm.numpy(), c_np, rtol=1e-5)
+print("Exercise 1 passed")
 
 # -----------------------------------------------------------------------------
 # Exercise 2: Element-wise Add with Broadcasting
@@ -83,6 +84,7 @@ b_tvm = tvm.runtime.tensor(b)
 c_tvm = tvm.runtime.tensor(np.empty((4, 4), dtype=np.int64))
 rt_lib["add"](a_tvm, b_tvm, c_tvm)
 np.testing.assert_allclose(c_tvm.numpy(), c_np, rtol=1e-5)
+print("Exercise 2 passed")
 
 
 # -----------------------------------------------------------------------------
@@ -136,6 +138,7 @@ conv_tvm = tvm.runtime.tensor(np.empty((N, CO, OUT_H, OUT_W), dtype=np.int64))
 rt_lib["conv"](data_tvm, weight_tvm, conv_tvm)
 # print(conv_tvm.numpy())
 np.testing.assert_allclose(conv_tvm.numpy(), conv_torch, rtol=1e-5)
+print("Exercise 3a passed")
 
 
 # -----------------------------------------------------------------------------
@@ -164,7 +167,7 @@ i0, i1 = sch.split(i, factors=[2, 2])  # split i into 2 outer * 2 inner
 sch.parallel(i0)    # run outer i loop across CPU threads
 sch.unroll(i1)      # unroll inner i loop (compiler expands iterations manually)
 sch.vectorize(j)    # use SIMD instructions for the j loop
-# print(sch.mod.script())
+print(sch.mod.script())
 
 
 # -----------------------------------------------------------------------------
@@ -229,6 +232,7 @@ b_tvm = tvm.runtime.tensor(b)
 c_tvm = tvm.runtime.tensor(np.empty((16, 128, 128), dtype=np.float32))
 rt_lib["bmm_relu"](a_tvm, b_tvm, c_tvm)
 np.testing.assert_allclose(c_tvm.numpy(), c_numpy, rtol=1e-5)
+print("Exercise 4 baseline verified")
 
 # Target: what the schedule should produce after all transformations
 @tvm.script.ir_module
@@ -289,11 +293,11 @@ sch.vectorize(j_init1)   # SIMD for the init (zero-fill) inner loop
 sch.vectorize(j_in1)     # SIMD for the relu inner loop
 sch.unroll(k1)           # unroll k1 (4 iterations) — compiler inlines them
 
-# print(sch.mod.script())
+print(sch.mod.script())
 
 # Verify the transformed schedule exactly matches the target structure
 tvm.ir.assert_structural_equal(sch.mod, TargetModule)
-# print("Pass")
+print("Exercise 4 transformation matches target")
 
 # Compare runtime performance before and after transformation
 before_rt_lib = tvm.compile(MyBmmRelu, target="llvm")
