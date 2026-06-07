@@ -231,6 +231,68 @@ write simple code → TVM auto-tunes → fast deployment on any hardware
 
 ---
 
+## Chapter 6 — GPU Acceleration
+
+### Part 1: GPU Thread Hierarchy and Shared Memory
+
+GPUs have thousands of cores. The key is mapping loop structure to GPU thread/block indices using `bind()`:
+
+```
+thread  = runs one element (threadIdx.x/y)
+block   = group of threads on one SM (blockIdx.x/y)
+grid    = all blocks together
+```
+
+Memory hierarchy (fast → slow): registers → shared memory → global memory
+
+| Transformation | What it does |
+|---|---|
+| `bind(loop, "blockIdx.x")` | Map loop to GPU block index |
+| `bind(loop, "threadIdx.x")` | Map loop to GPU thread index |
+| `cache_read(block, idx, "shared")` | Load input into shared memory (fast, block-wide) |
+| `cache_write(block, 0, "local")` | Accumulate output in registers (fastest, per-thread) |
+| `compute_at(load_block, loop)` | Place the shared memory load inside a specific loop level |
+| `fuse(i1, j1)` | Combine two loop dimensions so all threads cooperate on a load |
+
+The matmul optimization story: naive (global reads every step) → local blocking (accumulate in registers) → shared memory blocking (cooperatively load tiles from global once, reuse from shared).
+
+### Part 2: Hardware Specialization and Tensorization
+
+Hardware trend: scalar (1 element) → vector (8–16 elements, SIMD) → tensor (16×16 region in one instruction). ML is mostly matmul, so modern hardware has dedicated tensor core units.
+
+**The tensorization pipeline** — starting from a flat scalar matmul:
+
+```
+1. split i,j,k into 16-wide tiles
+   → inner loops now cover exactly one 16×16×16 hardware tile
+
+2. blockize(ii)
+   → collapses inner loops into one tensorized block
+   → TVM now treats the 16×16 region as a single operation
+
+3. cache_read("global.A_reg") / cache_read("global.B_reg")
+   → special memory scopes tag buffers as hardware registers
+   → compute_at(A_reg, k) places the load once per k tile
+
+4. cache_write("global.accumulator")
+   → partial sums stay in hardware register until the output tile is done
+   → reverse_compute_at writes results back after the j tile
+
+5. decompose_reduction
+   → separates zeroing the accumulator from accumulating
+
+6. tensorize(block_mm, "tmm16")
+   → replaces the matched block with the actual hardware instruction call
+```
+
+**TensorIntrin** bridges TVM's IR and the hardware instruction:
+- `tmm16_desc`: describes *what* the instruction computes (16×16×16 matmul pattern) — TVM uses this to find matching blocks
+- `tmm16_impl`: describes *how* to execute it — calls `T.call_extern("tmm16", ...)` which maps to the real hardware call (or a C simulation compiled via clang)
+
+On real GPUs the extern call would be a `wmma` (warp matrix multiply accumulate) instruction. Here it's a C function compiled via clang → LLVM IR and linked in with `pragma_import_llvm`.
+
+---
+
 ## Chapter 5 — Integration with ML Frameworks
 
 ### The problem Chapter 5 solves
@@ -322,5 +384,7 @@ Using `topi` in the `call_module_map` handlers means nn.Linear layers get transl
 - `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST (coded by me, annotated by Claude)
 - `automatic_program_optimization.py` — Chapter 4 automatic optimization with meta_schedule (coded by me, annotated by Claude)
 - `integration.py` — Chapter 5 PyTorch import via torch.fx, TE, BlockBuilder, topi (coded by me, annotated by Claude)
+- `gpu.py` — Chapter 6 Part 1: GPU thread/block binding, shared memory, matmul optimization (coded by me, annotated by Claude)
+- `spec_hardware.py` — Chapter 6 Part 2: tensorization, TensorIntrin, special memory scopes (coded by me, annotated by Claude)
 
 
