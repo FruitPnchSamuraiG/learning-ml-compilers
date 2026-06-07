@@ -379,12 +379,5 @@ Using `topi` in the `call_module_map` handlers means nn.Linear layers get transl
 
 ## Code
 
-- `tensorIR.py` — Chapter 2 notes and examples (coded by me, annotated by Claude)
-- `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation (coded by me, annotated by Claude)
-- `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST (coded by me, annotated by Claude)
-- `automatic_program_optimization.py` — Chapter 4 automatic optimization with meta_schedule (coded by me, annotated by Claude)
-- `integration.py` — Chapter 5 PyTorch import via torch.fx, TE, BlockBuilder, topi (coded by me, annotated by Claude)
-- `gpu.py` — Chapter 6 Part 1: GPU thread/block binding, shared memory, matmul optimization (coded by me, annotated by Claude)
-- `spec_hardware.py` — Chapter 6 Part 2: tensorization, TensorIntrin, special memory scopes (coded by me, annotated by Claude)
-
+- `tensorIR.py` — Chapter 2 notes and examples- `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation- `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST- `automatic_program_optimization.py` — Chapter 4 automatic optimization with meta_schedule- `integration.py` — Chapter 5 PyTorch import via torch.fx, TE, BlockBuilder, topi- `gpu.py` — Chapter 6 Part 1: GPU thread/block binding, shared memory, matmul optimization- `spec_hardware.py` — Chapter 6 Part 2: tensorization, TensorIntrin, special memory scopes
 
