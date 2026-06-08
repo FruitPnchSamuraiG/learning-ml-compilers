@@ -231,6 +231,107 @@ write simple code → TVM auto-tunes → fast deployment on any hardware
 
 ---
 
+## Chapter 7 — Computational Graph Optimization
+
+### The problem Chapter 7 solves
+
+Chapters 2–6 optimized individual ops: better loop structure, GPU parallelism, hardware instructions. But some of the biggest wins come from looking at *multiple ops together* — if matmul writes to memory and add immediately reads it back, you can eliminate that memory roundtrip entirely by fusing them into one kernel. That's graph-level optimization.
+
+### The IRModule is an AST you can walk
+
+An IRModule is a tree. Every binding is a node with a `var` (left side) and a `value` (right side). The `value` is a `Call` node with `.op` (which operation) and `.args` (the inputs). Knowing this structure is what makes pattern-matching rewrites possible:
+
+```
+IRModule
+└── Function ("main")
+    └── SeqExpr
+        └── DataflowBlock
+            ├── VarBinding: lv0 = multiply(x, y)   ← binding.var / binding.value
+            └── VarBinding: gv0 = add(lv0, y)       ← call.op = add, call.args = [lv0, y]
+```
+
+### Visitor pattern
+
+`relax.PyExprMutator` handles tree-walking. You override `visit_call_()` and write only the transformation logic — TVM calls your method for every `Call` node in the tree:
+
+```python
+@relax.expr_functor.mutator
+class EwiseFMARewriter(relax.PyExprMutator):
+    def visit_call_(self, call):
+        call = self.visit_expr_post_order(call)   # process children first
+        # check pattern → replace or return unchanged
+        value = self.lookup_binding(call.args[0]) # resolve var → the Call that made it
+        ...
+```
+
+`lookup_binding` is key: `call.args[0]` is `lv0` (a variable reference), not the multiply Call directly. `lookup_binding` resolves it back to the producing Call so you can check what it is.
+
+### Why sub-functions beat dedicated ops for fusion
+
+A dedicated fused op like `ewise_fma` requires registering a new op for every pattern. Sub-functions are a flexible container — any combination of ops can be grouped into one:
+
+```
+dedicated op (ewise_fma):           sub-function:
+→ one op per pattern                → flexible: holds any ops
+→ exponential combinations          → one sub-function per fused group
+→ doesn't scale                     → scales to any pattern!
+```
+
+Sub-functions are marked `Primitive=1` so downstream passes know not to fuse them again.
+
+### The full three-step pipeline
+
+```
+Step 1 — FuseDenseAddPass (custom)
+  pattern: matmul(x,w) → add(...,b)
+  result:  fused_matmul_add(x,w,b) sub-function (Primitive=1)
+
+Step 2 — LowerToTensorIRPass (custom)
+  op_map: "relax.matmul" → topi.nn.matmul
+          "relax.add"    → topi.add
+          "relax.nn.relu"→ topi.nn.relu
+  result:  fused sub-functions now call TensorIR prim_funcs via call_tir
+
+Step 3 — relax.transform.FuseTIR (built-in)
+  merges the two call_tir nodes inside each sub-function into ONE TensorIR function
+  result:  one kernel with matmul + add loops together → compiler optimizes across both
+```
+
+### Why fuse BEFORE lowering to TensorIR
+
+At the Relax level, `matmul + add` is two consecutive `Call` nodes — obvious. After lowering, both become separate loop nests in TensorIR; the pattern is buried in index arithmetic and much harder to detect automatically. Fuse at high level, then lower the fused version.
+
+### Module pass pattern
+
+```python
+@tvm.ir.transform.module_pass(opt_level=2, name="MyPass")
+class MyPass:
+    def transform_module(self, mod, ctx):
+        return MyTransformer(mod).transform()
+```
+
+Wrapping a transformation as a `module_pass` makes it a first-class pass that can be chained with other passes — custom passes compose with TVM's built-in passes.
+
+### The complete MLC pipeline
+
+```
+PyTorch model
+    ↓ ch5: import (torch.fx → IRModule)
+IRModule (high-level Relax)
+    ↓ ch7: graph fusion (FuseDenseAddPass)
+Fused IRModule (sub-functions, Primitive=1)
+    ↓ ch7: lower to TensorIR (LowerToTensorIRPass + FuseTIR)
+TensorIR IRModule
+    ↓ ch4: auto-tune (MetaSchedule)
+Optimized TensorIR
+    ↓ ch6: GPU/hardware mapping
+Hardware optimized
+    ↓ tvm.compile
+Fast deployment
+```
+
+---
+
 ## Chapter 6 — GPU Acceleration
 
 ### Part 1: GPU Thread Hierarchy and Shared Memory
@@ -379,5 +480,5 @@ Using `topi` in the `call_module_map` handlers means nn.Linear layers get transl
 
 ## Code
 
-- `tensorIR.py` — Chapter 2 notes and examples- `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation- `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST- `automatic_program_optimization.py` — Chapter 4 automatic optimization with meta_schedule- `integration.py` — Chapter 5 PyTorch import via torch.fx, TE, BlockBuilder, topi- `gpu.py` — Chapter 6 Part 1: GPU thread/block binding, shared memory, matmul optimization- `spec_hardware.py` — Chapter 6 Part 2: tensorization, TensorIntrin, special memory scopes
+- `tensorIR.py` — Chapter 2 notes and examples- `tensorIR_EX.py` — Chapter 2 exercises: element-wise add, broadcasting, 2D convolution, bmm_relu transformation- `end_2_end.py` — Chapter 3 end-to-end MLP on FashionMNIST- `automatic_program_optimization.py` — Chapter 4 automatic optimization with meta_schedule- `integration.py` — Chapter 5 PyTorch import via torch.fx, TE, BlockBuilder, topi- `gpu.py` — Chapter 6 Part 1: GPU thread/block binding, shared memory, matmul optimization- `spec_hardware.py` — Chapter 6 Part 2: tensorization, TensorIntrin, special memory scopes- `comp_graph_optimization.py` — Chapter 7: graph-level fusion, visitor pattern rewriter, lowering pipeline, FuseTIR
 
